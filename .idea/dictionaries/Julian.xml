@@ -2,6 +2,7 @@
   <dictionary name="Julian">
     <words>
       <w>filepaths</w>
+      <w>jsonl</w>
     </words>
   </dictionary>
 </component>

@@ -12,7 +12,7 @@ class PicoExtractor(HybridBlock):
 
         # Model layers defined here.
         with self.name_scope():
-            crf = CRF(tag2idx=tag2idx, ctx=ctx)
+            self.crf = CRF(tag2idx=tag2idx, ctx=ctx)
 
 
     def hybrid_forward(self, F, data):
