@@ -6,6 +6,9 @@ from glob import iglob
 from tqdm import tqdm
 
 
+START_TOKEN = '<START>'
+STOP_TOKEN = '<STOP>'
+
 if __name__ == '__main__':
     # Command line arguments.
     parser = argparse.ArgumentParser(description='Load PICO data for use in model.')
@@ -64,7 +67,7 @@ def get_instance_dict(doc_id):
 
             all_labels.append([doc_type[0] if ann == '1' else '0' for ann in annotation.split(',')])
 
-    new_labels = []
+    new_labels = [START_TOKEN]
     for i, o, p in zip(*all_labels):
         new_label = ''
 
@@ -79,6 +82,8 @@ def get_instance_dict(doc_id):
             new_label = 'x'
 
         new_labels.append(new_label)
+
+    new_labels.append(STOP_TOKEN)
 
     # Get tokens.
     token_filepath = get_token_filepath(doc_id)
