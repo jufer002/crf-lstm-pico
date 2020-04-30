@@ -6,8 +6,8 @@ from glob import iglob
 from tqdm import tqdm
 
 
-START_TOKEN = '<START>'
-STOP_TOKEN = '<STOP>'
+START_TOKEN = '<bos>'
+STOP_TOKEN = '<eos>'
 
 if __name__ == '__main__':
     # Command line arguments.

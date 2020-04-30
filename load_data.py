@@ -2,6 +2,8 @@ import jsonlines
 import transform
 import gluonnlp as nlp
 
+from build_gold_files import START_TOKEN, STOP_TOKEN
+
 
 def load_jsonl_to_array(filename):
     with jsonlines.open(filename) as docs:
@@ -26,7 +28,7 @@ def build_vocabulary(train_array, test_array):
     for array in (train_array, test_array):
         for i, instance in enumerate(array):
             sent, label_string = instance
-            tokens = sent.split(' ')
+            tokens = [START_TOKEN, *sent.lower().split(' '), STOP_TOKEN]
             labels = label_string.split(',')
 
             # In-place modification of array.
@@ -47,18 +49,26 @@ def _preprocess(x, vocab, max_len):
     Inputs: data instance x (tokenized), vocabulary, maximum length of input (in tokens)
     Outputs: data mapped to token IDs, with corresponding label
     """
-    label, ind1, ind2, text_tokens = x
-    data = vocab[text_tokens]   ## map tokens (strings) to unique IDs
-    data = data[:max_len]       ## truncate to max_len
-    return label, ind1, ind2, data
+    text_tokens, labels = x
+
+    if len(text_tokens) > max_len:
+        text_tokens = text_tokens[:max_len+1]  ## truncate to max_len
+        labels = labels[:max_len+1]
+
+        text_tokens[-1] = STOP_TOKEN
+        labels[-1] = STOP_TOKEN
+
+    data = vocab[text_tokens]  ## map tokens (strings) to unique IDs
+
+    return data, labels
 
 
 def preprocess_dataset(dataset, vocab, max_len):
-    preprocessed_dataset = [ _preprocess(x, vocab, max_len) for x in dataset]
+    preprocessed_dataset = [_preprocess(x, vocab, max_len) for x in dataset]
     return preprocessed_dataset
 
 
-def load_dataset(train_file, test_file, max_length=250):
+def load_dataset(train_file, test_file, max_length=500):
     # Load data from files.
     train_array = load_jsonl_to_array(train_file)
     test_array = load_jsonl_to_array(test_file)
@@ -69,8 +79,8 @@ def load_dataset(train_file, test_file, max_length=250):
     # Initialize the data transformer.
     basic_transform = transform.BasicTransform(all_labels, max_length)
 
+    # Preprocess the data.
+    train_dataset = preprocess_dataset(train_array, vocabulary, max_length)
+    test_dataset = preprocess_dataset(test_array, vocabulary, max_length)
 
-
-
-if __name__ == '__main__':
-    load_dataset('data/train.jsonl', 'data/test.jsonl')
+    return vocabulary, train_dataset, test_dataset, basic_transform

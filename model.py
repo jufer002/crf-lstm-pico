@@ -1,8 +1,8 @@
-from mxnet.gluon.block import HybridBlock
+from mxnet.gluon.block import Block
 from crf.crf import CRF
 
 
-class PicoExtractor(HybridBlock):
+class PicoExtractor(Block):
     """
     Your primary model block for attention-based, convolution-based or other classification model
     """
@@ -14,6 +14,5 @@ class PicoExtractor(HybridBlock):
         with self.name_scope():
             self.crf = CRF(tag2idx=tag2idx, ctx=ctx)
 
-
-    def hybrid_forward(self, F, data):
+    def forward(self, f, data):
         pass

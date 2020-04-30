@@ -27,3 +27,6 @@ class BasicTransform(object):
         padded_data = data + [0] * (self._max_seq_length - len(data))
         return mx.nd.array(padded_data, dtype='int32'), mx.nd.array(label_ids, dtype='int32')
 
+    def get_label_map(self):
+        return self._label_map
+
