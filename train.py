@@ -14,9 +14,16 @@ def get_data_loader(dataset, transformer, batch_size, shuffle):
     return gluon.data.DataLoader(transformed_dataset, batch_size=batch_size, shuffle=shuffle)
 
 
-def build_model(label_map, ctx):
-    pico_model = PicoExtractor(tag2idx=label_map, ctx=ctx)
-    pico_model.initialize(mx.init.Xavier(magnitude=2.34), ctx=ctx, force_reinit=True)
+def build_model(label_map, ctx, vocab_size, embedding_dim, lstm_hidden_dim):
+    pico_model = PicoExtractor(
+        tag2Idx=label_map,
+        ctx=ctx,
+        vocab_size=vocab_size,
+        embedding_dim=embedding_dim,
+        lstm_hidden_dim=lstm_hidden_dim
+    )
+    # Initialize params
+    pico_model.initialize(mx.init.Xavier(magnitude=2.34), ctx=ctx)
 
     return pico_model
 
@@ -45,10 +52,12 @@ def train_model(model, train_data_loader, test_data_loader, num_epochs):
 
             out = model(data)
 
-        with autograd.record():
-            pass
+            print(out)
 
-        trainer.step(1)
+        # with autograd.record():
+        #     pass
+        #
+        # trainer.step(1)
 
 
 if __name__ == '__main__':
@@ -84,7 +93,13 @@ if __name__ == '__main__':
     ctx = mx.cpu()
 
     # Build a model.
-    model = build_model(basic_transform.get_label_map(), ctx=ctx)
+    lstm_hidden_dim = 128
+    model = build_model(
+        label_map=basic_transform.get_label_map(), ctx=ctx,
+        vocab_size=len(vocabulary),
+        embedding_dim=len(vocabulary.embedding.idx_to_vec[0]),
+        lstm_hidden_dim=lstm_hidden_dim
+    )
 
     # Get our data loaders.
     train_data_loader = get_data_loader(
