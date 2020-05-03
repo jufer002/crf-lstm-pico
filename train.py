@@ -3,8 +3,9 @@ import gluonnlp as nlp
 import mxnet as mx
 
 from load_data import load_dataset
-from mxnet import gluon
 from model import PicoExtractor
+from mxnet import autograd
+from mxnet import gluon
 
 
 def get_data_loader(dataset, transformer, batch_size, shuffle):
@@ -17,6 +18,28 @@ def build_model(label_map, ctx):
     pico_model = PicoExtractor(tag2idx=label_map, ctx=ctx)
 
     return pico_model
+
+
+def train_model(model, train_data_loader, test_data_loader, num_epochs):
+    # Initialize variables.
+    model.initialize(mx.init.Xavier(magnitude=2.34), ctx=ctx, force_reinit=True)
+    differentiable_params = []
+
+    # Do not apply weight decay on LayerNorm and bias terms.
+    for _, v in model.collect_params('.*beta|.*gamma|.*bias').items():
+        v.wd_mult = 0.0
+
+    for p in model.collect_params().values():
+        if p.grad_req != 'null':
+            differentiable_params.append(p)
+
+    trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr})
+
+    # Train model.
+    for epoch in range(num_epochs):
+        with autograd.record():
+            pass
+        trainer.step(1)
 
 
 if __name__ == '__main__':
@@ -60,3 +83,7 @@ if __name__ == '__main__':
     test_data_loader = get_data_loader(
         test_dataset, transformer=basic_transform, batch_size=args.batch_size, shuffle=False
     )
+
+    train_model(model=model,
+                train_data_loader=train_data_loader, test_data_loader=test_data_loader,
+                num_epochs=args.epochs)
