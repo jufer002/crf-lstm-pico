@@ -14,5 +14,6 @@ class PicoExtractor(Block):
         with self.name_scope():
             self.crf = CRF(tag2idx=tag2idx, ctx=ctx)
 
-    def forward(self, f, data):
-        pass
+    def forward(self, data):
+
+        return 0

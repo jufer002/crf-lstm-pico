@@ -11,18 +11,21 @@ from mxnet import gluon
 def get_data_loader(dataset, transformer, batch_size, shuffle):
     transformed_dataset = gluon.data.SimpleDataset(dataset).transform(transformer)
 
+    for d in transformed_dataset:
+        print(d)
+    exit(0)
+
     return gluon.data.DataLoader(transformed_dataset, batch_size=batch_size, shuffle=shuffle)
 
 
 def build_model(label_map, ctx):
     pico_model = PicoExtractor(tag2idx=label_map, ctx=ctx)
+    pico_model.initialize(mx.init.Xavier(magnitude=2.34), ctx=ctx, force_reinit=True)
 
     return pico_model
 
 
 def train_model(model, train_data_loader, test_data_loader, num_epochs):
-    # Initialize variables.
-    model.initialize(mx.init.Xavier(magnitude=2.34), ctx=ctx, force_reinit=True)
     differentiable_params = []
 
     # Do not apply weight decay on LayerNorm and bias terms.
@@ -43,10 +46,11 @@ def train_model(model, train_data_loader, test_data_loader, num_epochs):
             # Contextualize data and the label.
             data = data_out_of_context.as_in_context(ctx)
             label = label_out_of_context.as_in_context(ctx)
-            print(data, label)
 
-        with autograd.record():
-            pass
+            out = model(data)
+
+        #with autograd.record():
+        #    pass
 
         #trainer.step(1)
 
@@ -70,7 +74,8 @@ if __name__ == '__main__':
 
     # Load the vocabulary, dataset, and data transformer.
     vocabulary, train_dataset, test_dataset, basic_transform = load_dataset(
-        train_file=args.train_file, test_file=args.test_file, max_length=500
+        # TODO Use higher max length
+        train_file=args.train_file, test_file=args.test_file, max_length=32
     )
 
     # Set the word embeddings.
@@ -89,6 +94,11 @@ if __name__ == '__main__':
     train_data_loader = get_data_loader(
         train_dataset, transformer=basic_transform, batch_size=args.batch_size, shuffle=True
     )
+
+    for x in train_data_loader:
+        print(x)
+    exit(0)
+
     test_data_loader = get_data_loader(
         test_dataset, transformer=basic_transform, batch_size=args.batch_size, shuffle=False
     )
