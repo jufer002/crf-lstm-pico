@@ -17,15 +17,23 @@ class BasicTransform(object):
     def __init__(self, labels, max_len=250):
         self._max_seq_length = max_len
         self._label_map = {
-            label: i
+            # Use i+1 to reserve 0 for the pad-label.
+            label: i+1
             for (i, label) in enumerate(labels)
         }
 
     def __call__(self, data, labels):
         label_ids = [self._label_map[label] for label in labels]
 
+        # Pad labels if necessary.
+        padded_label_ids = label_ids + [0] * (self._max_seq_length - len(label_ids))
+        # Pad data.
         padded_data = data + [0] * (self._max_seq_length - len(data))
-        return mx.nd.array(padded_data, dtype='int32'), mx.nd.array(label_ids, dtype='int32')
+
+        data_array = mx.nd.array(padded_data, dtype='int32')
+        label_array = mx.nd.array(padded_label_ids, dtype='int32')
+
+        return data_array, label_array
 
     def get_label_map(self):
         return self._label_map

@@ -37,9 +37,18 @@ def train_model(model, train_data_loader, test_data_loader, num_epochs):
 
     # Train model.
     for epoch in range(num_epochs):
+        epoch_loss = 0
+
+        for i, (data_out_of_context, label_out_of_context) in enumerate(train_data_loader):
+            # Contextualize data and the label.
+            data = data_out_of_context.as_in_context(ctx)
+            label = label_out_of_context.as_in_context(ctx)
+            print(data, label)
+
         with autograd.record():
             pass
-        trainer.step(1)
+
+        #trainer.step(1)
 
 
 if __name__ == '__main__':
