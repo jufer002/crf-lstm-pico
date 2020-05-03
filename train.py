@@ -9,11 +9,7 @@ from mxnet import gluon
 
 
 def get_data_loader(dataset, transformer, batch_size, shuffle):
-    transformed_dataset = gluon.data.SimpleDataset(dataset).transform(transformer)
-
-    for d in transformed_dataset:
-        print(d)
-    exit(0)
+    transformed_dataset = gluon.data.ArrayDataset(dataset).transform(transformer)
 
     return gluon.data.DataLoader(transformed_dataset, batch_size=batch_size, shuffle=shuffle)
 
@@ -49,10 +45,10 @@ def train_model(model, train_data_loader, test_data_loader, num_epochs):
 
             out = model(data)
 
-        #with autograd.record():
-        #    pass
+        with autograd.record():
+            pass
 
-        #trainer.step(1)
+        trainer.step(1)
 
 
 if __name__ == '__main__':
@@ -94,10 +90,6 @@ if __name__ == '__main__':
     train_data_loader = get_data_loader(
         train_dataset, transformer=basic_transform, batch_size=args.batch_size, shuffle=True
     )
-
-    for x in train_data_loader:
-        print(x)
-    exit(0)
 
     test_data_loader = get_data_loader(
         test_dataset, transformer=basic_transform, batch_size=args.batch_size, shuffle=False

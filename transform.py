@@ -14,7 +14,7 @@ class BasicTransform(object):
         Maximum sequence length - longer seqs will be truncated and shorter ones padded
 
     """
-    def __init__(self, labels, max_len=250):
+    def __init__(self, labels, max_len):
         self._max_seq_length = max_len
         self._label_map = {
             # Use i+1 to reserve 0 for the pad-label.
@@ -37,4 +37,3 @@ class BasicTransform(object):
 
     def get_label_map(self):
         return self._label_map
-

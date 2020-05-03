@@ -52,11 +52,11 @@ def _preprocess(x, vocab, max_len):
     text_tokens, labels = x
 
     if len(text_tokens) > max_len:
-        text_tokens = text_tokens[:max_len+1]  ## truncate to max_len
-        labels = labels[:max_len+1]
+        text_tokens[max_len - 1] = STOP_TOKEN
+        labels[max_len - 1] = STOP_TOKEN
 
-        text_tokens[-1] = STOP_TOKEN
-        labels[-1] = STOP_TOKEN
+        text_tokens = text_tokens[:max_len]  ## truncate to max_len
+        labels = labels[:max_len]
 
     data = vocab[text_tokens]  ## map tokens (strings) to unique IDs
 
