@@ -1,4 +1,5 @@
 import mxnet as mx
+from build_gold_files import STOP_TOKEN
 
 
 class BasicTransform(object):
@@ -18,7 +19,7 @@ class BasicTransform(object):
         self._max_seq_length = max_len
         self._label_map = {
             # Use i+1 to reserve 0 for the pad-label.
-            label: i+1
+            label: i
             for (i, label) in enumerate(labels)
         }
 
@@ -28,7 +29,7 @@ class BasicTransform(object):
         # Pad labels if necessary.
         padded_label_ids = label_ids + [0] * (self._max_seq_length - len(label_ids))
         # Pad data.
-        padded_data = data + [0] * (self._max_seq_length - len(data))
+        padded_data = data + [self._label_map[STOP_TOKEN]] * (self._max_seq_length - len(data))
 
         data_array = mx.nd.array(padded_data, dtype='int32')
         label_array = mx.nd.array(padded_label_ids, dtype='int32')

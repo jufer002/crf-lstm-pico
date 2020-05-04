@@ -6,6 +6,7 @@ from load_data import load_dataset
 from model import PicoExtractor
 from mxnet import autograd
 from mxnet import gluon
+from tqdm import tqdm
 
 
 def get_data_loader(dataset, transformer, batch_size, shuffle):
@@ -14,7 +15,7 @@ def get_data_loader(dataset, transformer, batch_size, shuffle):
     return gluon.data.DataLoader(transformed_dataset, batch_size=batch_size, shuffle=shuffle)
 
 
-def build_model(label_map, ctx, vocab_size, embedding_dim, lstm_hidden_dim):
+def build_model(label_map, ctx, vocab_size, embedding_dim, lstm_hidden_dim, vocabulary):
     pico_model = PicoExtractor(
         tag2Idx=label_map,
         ctx=ctx,
@@ -23,7 +24,7 @@ def build_model(label_map, ctx, vocab_size, embedding_dim, lstm_hidden_dim):
         lstm_hidden_dim=lstm_hidden_dim
     )
     # Initialize params
-    pico_model.initialize(mx.init.Xavier(magnitude=2.34), ctx=ctx)
+    pico_model.initialize(mx.init.Xavier(magnitude=2.34), ctx=ctx, force_reinit=True, vocabulary=vocabulary)
 
     return pico_model
 
@@ -39,25 +40,27 @@ def train_model(model, train_data_loader, test_data_loader, num_epochs):
         if p.grad_req != 'null':
             differentiable_params.append(p)
 
-    trainer = gluon.Trainer(model.collect_params(), 'adam', {'learning_rate': args.lr})
+    trainer = gluon.Trainer(model.collect_params(), args.optimizer, {'learning_rate': args.lr})
 
     # Train model.
     for epoch in range(num_epochs):
         epoch_loss = 0
 
-        for i, (data_out_of_context, label_out_of_context) in enumerate(train_data_loader):
+        for i, (data_out_of_context, labels_out_of_context) in tqdm(enumerate(train_data_loader),
+                                                                    desc=f'Training on epoch[{epoch}]',
+                                                                    total=len(train_data_loader)):
             # Contextualize data and the label.
             data = data_out_of_context.as_in_context(ctx)
-            label = label_out_of_context.as_in_context(ctx)
+            labels = labels_out_of_context.as_in_context(ctx)
 
-            out = model(data)
+            with autograd.record():
+                neg_log_likelihood = model.neg_log_likelihood(data, labels)
+                neg_log_likelihood.backward()
 
-            print(out)
+            trainer.step(1)
+            epoch_loss += neg_log_likelihood.mean().asscalar()
 
-        # with autograd.record():
-        #     pass
-        #
-        # trainer.step(1)
+        print(f'Epoch: {epoch}\n  Loss: {epoch_loss}')
 
 
 if __name__ == '__main__':
@@ -70,12 +73,14 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=10, help='Upper epoch limit')
     parser.add_argument('--optimizer', type=str, help='Optimizer (adam, sgd, etc.)', default='adam')
     parser.add_argument('--lr', type=float, help='Learning rate', default=0.0001)
-    parser.add_argument('--batch_size', type=int, help='Training batch size', default=16)
+    parser.add_argument('--batch_size', type=int, help='Training batch size', default=128)
     parser.add_argument('--dropout', type=float, help='Dropout ratio', default=0.3)
-    parser.add_argument('--embedding_source', type=str, default='glove.6B.100d',
+    parser.add_argument('--embedding_source', type=str, default='glove.6B.50d',
                         help='Pre-trained embedding source name')
 
     args = parser.parse_args()
+
+    loss_fn = nlp.loss.MaskedSoftmaxCELoss()
 
     # Load the vocabulary, dataset, and data transformer.
     vocabulary, train_dataset, test_dataset, basic_transform = load_dataset(
@@ -98,7 +103,8 @@ if __name__ == '__main__':
         label_map=basic_transform.get_label_map(), ctx=ctx,
         vocab_size=len(vocabulary),
         embedding_dim=len(vocabulary.embedding.idx_to_vec[0]),
-        lstm_hidden_dim=lstm_hidden_dim
+        lstm_hidden_dim=lstm_hidden_dim,
+        vocabulary=vocabulary
     )
 
     # Get our data loaders.

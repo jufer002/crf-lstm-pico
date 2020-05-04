@@ -6,6 +6,7 @@
       <w>jsonl</w>
       <w>lstm</w>
       <w>mult</w>
+      <w>reinit</w>
     </words>
   </dictionary>
 </component>
