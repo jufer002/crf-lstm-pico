@@ -29,6 +29,14 @@ def build_model(label_map, ctx, vocab_size, embedding_dim, lstm_hidden_dim, voca
     return pico_model
 
 
+def evaluate(model, test_data_loader):
+    for i, (data_out_of_context, labels_out_of_context) in tqdm(enumerate(test_data_loader),
+                                                                desc=f'Evaluating on test',
+                                                                total=len(test_data_loader)):
+        data = data_out_of_context.as_in_context(ctx)
+        label = labels_out_of_context.as_in_context(ctx)
+
+
 def train_model(model, train_data_loader, test_data_loader, num_epochs):
     differentiable_params = []
 
@@ -54,13 +62,18 @@ def train_model(model, train_data_loader, test_data_loader, num_epochs):
             labels = labels_out_of_context.as_in_context(ctx)
 
             with autograd.record():
-                neg_log_likelihood = model.neg_log_likelihood(data, labels)
+                neg_log_likelihood = model.neg_log_likelihood(data, labels, ag=autograd)
                 neg_log_likelihood.backward()
 
             trainer.step(1)
             epoch_loss += neg_log_likelihood.mean().asscalar()
 
+        epoch_results = evaluate(model, test_data_loader)
         print(f'Epoch: {epoch}\n  Loss: {epoch_loss}')
+
+        if args.save_params:
+            # Save model params.
+            model.save_parameters('model/model.params')
 
 
 if __name__ == '__main__':
@@ -73,10 +86,14 @@ if __name__ == '__main__':
     parser.add_argument('--epochs', type=int, default=10, help='Upper epoch limit')
     parser.add_argument('--optimizer', type=str, help='Optimizer (adam, sgd, etc.)', default='adam')
     parser.add_argument('--lr', type=float, help='Learning rate', default=0.0001)
-    parser.add_argument('--batch_size', type=int, help='Training batch size', default=128)
+    parser.add_argument('--batch_size', type=int, help='Training batch size', default=32)
     parser.add_argument('--dropout', type=float, help='Dropout ratio', default=0.3)
-    parser.add_argument('--embedding_source', type=str, default='glove.6B.50d',
+    parser.add_argument('--embedding_source', type=str, default='glove.6B.100d',
                         help='Pre-trained embedding source name')
+    parser.add_argument('--load_params', action='store_true', default=True,
+                        help='If argument is present, load params from model/model.params')
+    parser.add_argument('--save_params', action='store_true', default=True,
+                        help='If argument is present, save params after each epoch to model/model.params')
 
     args = parser.parse_args()
 
@@ -106,6 +123,9 @@ if __name__ == '__main__':
         lstm_hidden_dim=lstm_hidden_dim,
         vocabulary=vocabulary
     )
+
+    if args.load_params:
+        model.load_parameters('model/model.params', ctx)
 
     # Get our data loaders.
     train_data_loader = get_data_loader(

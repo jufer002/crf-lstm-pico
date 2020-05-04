@@ -26,14 +26,18 @@ class PicoExtractor(Block):
                 ctx=ctx
             )
 
-    def neg_log_likelihood(self, data, labels):
+    def neg_log_likelihood(self, data, labels, ag):
         # Slice x like this because the lstm_crf._score_sentence function
         # does not expect <bos> and <eos> tokens in the data; only in the
         # tags.
         data = mx.nd.array(data[:, 1:-1])
         funcs = []
         for (x, y) in zip(data, labels):
-            funcs.append(lambda: self.lstm_crf.neg_log_likelihood(x, y))
+            def compute_neg_log_likelihood():
+                with ag.record():
+                    return self.lstm_crf.neg_log_likelihood(x, y)
+
+            funcs.append(compute_neg_log_likelihood)
 
         log_likes = []
         with ThreadPoolExecutor() as executor:
