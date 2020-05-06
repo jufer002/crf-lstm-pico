@@ -1,3 +1,5 @@
+/.idea/
+/__pycache__/
 crf/
 lstm_crf/
 data/annotations

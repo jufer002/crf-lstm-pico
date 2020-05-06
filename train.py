@@ -112,7 +112,7 @@ if __name__ == '__main__':
         vocabulary.set_embedding(glove_embeddings)
 
     # Create context object.
-    ctx = mx.cpu()
+    ctx = mx.gpu()
 
     # Build a model.
     lstm_hidden_dim = 128
@@ -125,6 +125,7 @@ if __name__ == '__main__':
     )
 
     if args.load_params:
+        print('Loading model parameters from model/model.params...')
         model.load_parameters('model/model.params', ctx)
 
     # Get our data loaders.
