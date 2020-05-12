@@ -77,7 +77,6 @@ def get_instance_dict(doc_id):
             new_label += o
         if p != '0':
             new_label += p
-
         elif new_label == '':
             new_label = 'X'
 

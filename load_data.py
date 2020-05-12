@@ -68,7 +68,7 @@ def preprocess_dataset(dataset, vocab, max_len):
     return preprocessed_dataset
 
 
-def load_dataset(train_file, test_file, max_length=500):
+def load_dataset(train_file, test_file, max_length):
     # Load data from files.
     train_array = load_jsonl_to_array(train_file)
     test_array = load_jsonl_to_array(test_file)

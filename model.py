@@ -10,11 +10,12 @@ class PicoExtractor(Block):
     Your primary model block for attention-based, convolution-based or other classification model
     """
 
-    def __init__(self, tag2Idx, ctx, vocab_size, embedding_dim, lstm_hidden_dim):
+    def __init__(self, tag2Idx, ctx, vocab_size, embedding_dim, lstm_hidden_dim, dropout):
         super(PicoExtractor, self).__init__()
 
         self.ctx = ctx
         self.num_labels = len(tag2Idx)
+        self.label_map = tag2Idx
 
         # Model layers defined here.
         with self.name_scope():
@@ -23,20 +24,31 @@ class PicoExtractor(Block):
                 tag2Idx=tag2Idx,
                 embedding_dim=embedding_dim,
                 hidden_dim=lstm_hidden_dim,
-                ctx=ctx
+                ctx=ctx,
+                dropout=dropout
             )
 
     def neg_log_likelihood(self, data, labels, ag):
         # Slice x like this because the lstm_crf._score_sentence function
         # does not expect <bos> and <eos> tokens in the data; only in the
         # tags.
+        # data = mx.nd.array(data[:, 1:-1])
+        # return self.lstm_crf.neg_log_likelihood(data, labels)
+
         data = mx.nd.array(data[:, 1:-1])
+        log_like = mx.nd.array([0], ctx=self.ctx)
+        for (x, y) in zip(data, labels):
+            log_like = log_like + self.lstm_crf.neg_log_likelihood(x, y)
+
+        return log_like
+
+        '''
         funcs = []
         for (x, y) in zip(data, labels):
             def compute_neg_log_likelihood():
                 with ag.record():
                     return self.lstm_crf.neg_log_likelihood(x, y)
-
+    
             funcs.append(compute_neg_log_likelihood)
 
         log_likes = []
@@ -50,6 +62,7 @@ class PicoExtractor(Block):
             log_like = log_like + loss
 
         return log_like
+        '''
 
     # Manually override initialize function to make sure lstm_crf initializes properly.
     def initialize(self, init=mx.initializer.Uniform(), ctx=None, verbose=False,
@@ -59,6 +72,7 @@ class PicoExtractor(Block):
         self.lstm_crf.word_embeds.weight.set_data(vocabulary.embedding.idx_to_vec)
 
     def forward(self, data):
+        data = mx.nd.array(data[1:-1])
         # Loop through each sentence
         score, tag_seq = self.lstm_crf(data)
 
