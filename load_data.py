@@ -1,3 +1,9 @@
+"""
+Author: Julian Fernandez
+
+This module preprocesses the gold files into dataset objects that are nearly ready to be fed into the model.
+"""
+
 import jsonlines
 import transform
 import gluonnlp as nlp

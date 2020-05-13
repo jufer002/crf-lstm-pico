@@ -1,3 +1,14 @@
+"""
+Author: Julian Fernandez
+
+This module preprocesses the EBM-NLP dataset into two jsonl files: train and test.
+
+This module exists because the dataset contains four different files per sentence in the data.
+One file contains the sentence's tokens, and three files contain a binary indication of which tokens are labeled with
+one of the three entity types. The jsonl output of this module contains a dictionary on each line whose keys are the
+document's ID, the sentence's tokens, and the sentence's labels condensed into one string per token.
+"""
+
 import os
 import argparse
 import jsonlines
@@ -67,6 +78,7 @@ def get_instance_dict(doc_id):
 
             all_labels.append([doc_type[0].upper() if ann == '1' else '0' for ann in annotation.split(',')])
 
+    # Condense the labels so that they form one string per token.
     new_labels = [START_TOKEN]
     for i, o, p in zip(*all_labels):
         new_label = ''

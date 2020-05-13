@@ -1,3 +1,10 @@
+"""
+Author: Julian Fernandez
+
+This module is a thin layer on top of the lstm_crf module, which is found here:
+https://github.com/apache/incubator-mxnet/tree/master/example/gluon/lstm_crf
+"""
+
 import mxnet as mx
 
 from concurrent.futures import ThreadPoolExecutor
@@ -28,27 +35,26 @@ class PicoExtractor(Block):
                 dropout=dropout
             )
 
-    def neg_log_likelihood(self, data, labels, ag):
-        # Slice x like this because the lstm_crf._score_sentence function
+    def neg_log_likelihood(self, data, labels, ag=None):
+        # Slice data like this because the lstm_crf._score_sentence function
         # does not expect <bos> and <eos> tokens in the data; only in the
         # tags.
-        # data = mx.nd.array(data[:, 1:-1])
-        # return self.lstm_crf.neg_log_likelihood(data, labels)
-
         data = mx.nd.array(data[:, 1:-1])
-        log_like = mx.nd.array([0], ctx=self.ctx)
-        for (x, y) in zip(data, labels):
-            log_like = log_like + self.lstm_crf.neg_log_likelihood(x, y)
+        # If no autograd object is passed in, loop through the batch and feed it one-by-one.
+        if ag is None:
+            log_like = mx.nd.array([0], ctx=self.ctx)
+            for (x, y) in zip(data, labels):
+                log_like = log_like + self.lstm_crf.neg_log_likelihood(x, y)
 
-        return log_like
+            return log_like
 
-        '''
+        # Otherwise, try an experimental multithreaded approach.
         funcs = []
         for (x, y) in zip(data, labels):
             def compute_neg_log_likelihood():
                 with ag.record():
                     return self.lstm_crf.neg_log_likelihood(x, y)
-    
+
             funcs.append(compute_neg_log_likelihood)
 
         log_likes = []
@@ -62,7 +68,6 @@ class PicoExtractor(Block):
             log_like = log_like + loss
 
         return log_like
-        '''
 
     # Manually override initialize function to make sure lstm_crf initializes properly.
     def initialize(self, init=mx.initializer.Uniform(), ctx=None, verbose=False,

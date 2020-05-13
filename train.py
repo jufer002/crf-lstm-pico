@@ -1,3 +1,10 @@
+"""
+Author: Julian Fernandez
+This module contains the main train loop.
+
+Running this will build a model, train it, and evaluate it after each epoch.
+"""
+
 import argparse
 import gluonnlp as nlp
 import mxnet as mx
@@ -56,6 +63,15 @@ def safe_divide(a, b):
 
 
 def compute_metrics(pred_label_strings, true_label_strings):
+    """
+    Compute F-score, precicion, and recall for each entiy type.
+    Args:
+        pred_label_strings: model output
+        true_label_strings: ground truth
+
+    Returns:
+
+    """
     # Create a dictionary that holds metrics for each entity type.
     metric_dict = {
         ent_type: {
@@ -104,30 +120,46 @@ def compute_metrics(pred_label_strings, true_label_strings):
     return metric_dict
 
 
-def predict_on_test(model, test_dataset, label_map):
+def evaluate(model, test_dataloader, label_map):
+    """
+    Args:
+        model: a PicoExtractor model
+        test_dataloader: Gluon Dataloader object of the dataset.
+        label_map: A dictionary that maps from label strings to unique integers.
+
+    Returns: a dictionary of performance metrics.
+
+    """
+
+    # This inverted index is possible because the label_map's values are unique.
+    # It's used to compare the model's output to the ground truth.
     inv_label_map = {
         label_id: label_str
         for label_str, label_id in label_map.items()
     }
 
+    # Create a dictionary of metrics per label.
     total_metrics = {
         ent_type: {
             'f1': 0,
             'prec': 0,
             'recall': 0
         }
+        # Also include an ALL category that computes metrics over all data.s
         for ent_type in ENT_TYPES + ['ALL']
     }
 
-    for i, (data_out_of_context, labels_out_of_context) in tqdm(enumerate(test_dataset),
+    # Loop through the test dataloader, compute the model's output, and evaluate it.
+    for i, (data_out_of_context, labels_out_of_context) in tqdm(enumerate(test_dataloader),
                                                                 desc=f'Predicting on test',
-                                                                total=len(test_dataset)):
+                                                                total=len(test_dataloader)):
         data = data_out_of_context.as_in_context(ctx)
         labels = labels_out_of_context.as_in_context(ctx)
 
         for x, y in zip(data, labels):
             score, tag_seq = model(x)
 
+            # Get the strings from the model's integer output.
             pred_label_strings = [inv_label_map[tag] for tag in tag_seq]
             true_label_strings = [inv_label_map[label.asscalar()] for label in y]
 
@@ -140,24 +172,16 @@ def predict_on_test(model, test_dataset, label_map):
 
     avg_dict = copy.deepcopy(total_metrics)
     for ent_type in total_metrics:
-        avg_dict[ent_type]['f1'] /= len(test_dataset) * args.batch_size
-        avg_dict[ent_type]['prec'] /= len(test_dataset) * args.batch_size
-        avg_dict[ent_type]['recall'] /= len(test_dataset) * args.batch_size
+        avg_dict[ent_type]['f1'] /= len(test_dataloader) * args.batch_size
+        avg_dict[ent_type]['prec'] /= len(test_dataloader) * args.batch_size
+        avg_dict[ent_type]['recall'] /= len(test_dataloader) * args.batch_size
 
     print(json.dumps(avg_dict, indent=2))
 
     return avg_dict
 
 
-def evaluate(model, test_dataset):
-    for i, (data_out_of_context, labels_out_of_context) in tqdm(enumerate(test_dataset),
-                                                                desc=f'Evaluating on test',
-                                                                total=len(test_dataset)):
-        data = data_out_of_context.as_in_context(ctx)
-        label = labels_out_of_context.as_in_context(ctx)
-
-
-def train_model(model, train_data_loader, test_dataset, num_epochs):
+def train_model(model, train_data_loader, test_dataloader, num_epochs):
     differentiable_params = []
 
     # Do not apply weight decay on LayerNorm and bias terms.
@@ -182,17 +206,16 @@ def train_model(model, train_data_loader, test_dataset, num_epochs):
             labels = labels_out_of_context.as_in_context(ctx)
 
             with autograd.record():
-                neg_log_likelihood = model.neg_log_likelihood(data, labels, ag=autograd)
+                neg_log_likelihood = model.neg_log_likelihood(data, labels)
                 neg_log_likelihood.backward()
 
             trainer.step(1)
             epoch_loss += neg_log_likelihood.mean().asscalar()
 
-        # epoch_results = evaluate(model, test_dataset)
         print(f'Epoch: {epoch}')
         print(f'  Loss: {epoch_loss}')
 
-        metric_dict = predict_on_test(model, test_dataset, model.label_map)
+        metric_dict = evaluate(model, test_dataloader, model.label_map)
 
         with open('output/metrics.txt', 'a') as fp:
             json.dump(metric_dict, fp, indent=4)
@@ -218,9 +241,9 @@ if __name__ == '__main__':
                         help='Pre-trained embedding source name')
     parser.add_argument('--load_params', action='store_true', default=True,
                         help='If argument is present, load params from model/model.params')
-    parser.add_argument('--save_params', action='store_true', default=True,
+    parser.add_argument('--save_params', action='store_true', default=False,
                         help='If argument is present, save params after each epoch to model/model.params')
-    parser.add_argument('--no_train', action='store_true', default=False,
+    parser.add_argument('--no_train', action='store_true', default=True,
                         help='If argument is present, skip training and just predict on the test data.')
     parser.add_argument('--output_file', type=str, help='File in which to write test predictions.',
                         default='output/preds_test.jsonl')
@@ -268,15 +291,12 @@ if __name__ == '__main__':
         test_dataset, transformer=basic_transform, batch_size=args.batch_size, shuffle=False
     )
 
-    # Don't use a dataloader for the test data. It's easier not to use batches here.
-    test_dataset = gluon.data.ArrayDataset(test_dataset).transform(basic_transform)
-
     if not args.no_train:
         train_model(model=model,
-                    train_data_loader=train_data_loader, test_dataset=test_data_loader,
+                    train_data_loader=train_data_loader, test_dataloader=test_data_loader,
                     num_epochs=args.epochs)
 
-    predict_on_test(
-        model=model, test_dataset=test_data_loader,
+    evaluate(
+        model=model, test_dataloader=test_data_loader,
         label_map=basic_transform.get_label_map()
     )
